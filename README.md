@@ -6,6 +6,9 @@
 
 This is a Cosmos App project bootstrapped with [`create-cosmos-app`](https://github.com/hyperweb-io/create-cosmos-app).
 
+**Iswap** to niepowierniczy AMM DEX do wymiany tokenów IPI (`nipi`) na łańcuchu IPI.
+Zakres, model DEX, integracje i kryteria akceptacji opisuje **[docs/PRD.md](docs/PRD.md)** (Fala 3).
+
 ## Getting Started
 
 First, install the packages and run the development server:
