@@ -2,14 +2,15 @@
 
 > Product Requirements Document · Fala 3 · status: **DRAFT do przeglądu**
 > Repo: `ipicoin/Iswap` · Zamyka: [#1](https://github.com/ipicoin/Iswap/issues/1) · Realizuje: [#2](https://github.com/ipicoin/Iswap/issues/2)
-> SSOT: denom `nipi` (9 miejsc dziesiętnych), portfel `wallet-core.js`, RPC `https://ipicoin.eu/rpc`
+> SSOT: base denom `nipi` (9 miejsc dziesiętnych), ticker/symbol **`IPI`** (1 IPI = 10^9 nipi), portfel `wallet-core.js`, RPC `https://ipicoin.eu/rpc`
+> Druga strona pary w MVP: **testowy token cw20** (test/faucet) wdrożony na łańcuchu IPI. IBC/inne aktywa = faza 2.
 
 ---
 
 ## 1. Cel
 
 Dostarczyć IPI DAO działającą aplikację **swap/DEX** umożliwiającą wymianę tokenów w
-ekosystemie IPI (natywny token `nipi` oraz aktywa sparowane) w sposób:
+ekosystemie IPI — w MVP para **`nipi` (natywny, ticker IPI) ↔ testowy token cw20** — w sposób:
 
 - **niepowierniczy** (non-custodial) — użytkownik podpisuje transakcje własnym kluczem przez `wallet-core.js`,
 - **oparty o AMM** (Automated Market Maker) — brak księgi zleceń, ceny z puli płynności,
@@ -24,7 +25,7 @@ zakodowany na sztywno pod sieć **Osmosis** (`osmo-query`, moduły GAMM/poolmana
 
 | Persona | Potrzeba | Kluczowa historia |
 | --- | --- | --- |
-| **Posiadacz IPI** | Wymienić `nipi` na inny token pary bez zaufanego pośrednika | „Chcę zamienić 100 IPI na token X po znanej cenie" |
+| **Posiadacz IPI** | Wymienić `nipi` na token pary (w MVP: testowy token cw20) bez zaufanego pośrednika | „Chcę zamienić 100 IPI na testowy token cw20 po znanej cenie" |
 | **Dostawca płynności (LP)** | Zarabiać na opłatach dostarczając kapitał do puli | „Chcę wpłacić parę i otrzymać udziały LP" (faza 2) |
 | **DAO / skarbnik** | Zarządzać parametrami rynku (opłaty, listing par) przez governance | „Chcę utworzyć nową pulę i ustawić opłatę" |
 | **Deweloper / integrator** | Programowo kwotować i wykonywać swap | „Chcę wywołać kontrakt/RPC z zewnętrznej apki" |
@@ -33,12 +34,20 @@ zakodowany na sztywno pod sieć **Osmosis** (`osmo-query`, moduły GAMM/poolmana
 
 **W zakresie (MVP):**
 
+Para MVP = **`nipi` (natywny, ticker IPI) ↔ testowy token cw20**. Ponieważ IPI ma
+obecnie tylko token natywny `nipi` (IBC odroczone do fazy 2), drugą stroną puli jest
+**prosty kontrakt cw20** (test/faucet token) wdrożony na łańcuchu IPI — dostarcza realny,
+sparowalny asset do uruchomienia i testów AMM end-to-end bez zależności od IBC.
+
 1. Połączenie portfela przez `wallet-core.js` (adres, saldo, podpis).
-2. Wybór pary tokenów (from → to) z listy wspieranych aktywów.
-3. **Kwotowanie** — wyliczenie kwoty wyjściowej z rezerw puli (`x*y=k`), z opłatą puli.
-4. **Slippage tolerance** — presety (0.5% / 1% / 3%) + wartość własna; wyliczenie `minAmountOut`.
-5. **Swap** — złożenie i podpisanie transakcji, potwierdzenie, obsługa błędów.
-6. Wskaźniki: cena, price impact, opłata, minimalny odbiór, trasa (route).
+2. **Wdrożenie testowego tokena cw20** — standardowy kontrakt `cw20-base` (mint/faucet
+   do testów), zarejestrowany w konfiguracji jako drugi asset pary.
+3. Utworzenie puli `nipi ↔ cw20-test` na kontrakcie AMM (bootstrap rezerw z faucetu).
+4. Wybór pary tokenów (from → to) z listy wspieranych aktywów (natywny `nipi` + cw20).
+5. **Kwotowanie** — wyliczenie kwoty wyjściowej z rezerw puli (`x*y=k`), z opłatą puli.
+6. **Slippage tolerance** — presety (0.5% / 1% / 3%) + wartość własna; wyliczenie `minAmountOut`.
+7. **Swap** — złożenie i podpisanie transakcji, potwierdzenie, obsługa błędów.
+8. Wskaźniki: cena, price impact, opłata, minimalny odbiór, trasa (route).
 
 **Poza MVP (faza 2+):** patrz §11.
 
@@ -50,8 +59,9 @@ zakodowany na sztywno pod sieć **Osmosis** (`osmo-query`, moduły GAMM/poolmana
 
 **Opcja A — natywny AMM na CosmWasm (rekomendowana):**
 kontrakt puli constant-product (`x*y=k`) wdrożony na łańcuchu IPI (moduł `wasmd`).
-Zamiast pisać od zera — **fork audytowanego kontraktu** (Astroport / WYND DEX / port GAMM
-do CosmWasm) i dostosowanie do `nipi`.
+Zamiast pisać od zera — **fork audytowanego kontraktu** (Astroport pair-xyk / WYND DEX)
+i dostosowanie do `nipi` + testowego cw20. (GAMM to moduł Go w Osmosis — **nie istnieje**
+jego audytowany port CosmWasm, więc nie jest opcją forka.)
 
 **Opcja B — integracja z istniejącym DEX (Osmosis via IBC):**
 token IPI transferowany po IBC na Osmosis, pula GAMM na Osmosis, front kwotuje/wykonuje
@@ -78,7 +88,7 @@ i strategiczne nieproporcjonalne do MVP. Model A daje działający swap natychmi
 własnym łańcuchu.
 
 Aby ograniczyć ryzyko bezpieczeństwa, **nie piszemy AMM od zera** — forkujemy audytowany
-kontrakt (Astroport pair xyk / WYND / cw port GAMM) i dostosowujemy denominacje i UI.
+kontrakt (Astroport pair-xyk / WYND) i dostosowujemy denominacje i UI.
 Model B nie jest odrzucony — wchodzi jako **faza 2** (listing na Osmosis po IBC) dla
 dostępu do zewnętrznej płynności i widoczności, gdy rynek natywny okrzepnie.
 
@@ -89,8 +99,9 @@ dostępu do zewnętrznej płynności i widoczności, gdy rynek natywny okrzepnie
 ## 5. Funkcje
 
 ### 5.1 Wybór pary
-- Lista wspieranych tokenów z konfiguracji (`config/`), rozszerzonej o `chainconfig` IPI.
-- Domyślnie para `nipi` ↔ token bazowy.
+- Lista wspieranych tokenów z konfiguracji (`config/`), rozszerzonej o `chainconfig` IPI:
+  natywny `nipi` (ticker IPI) + **testowy token cw20** (adres kontraktu w konfiguracji).
+- Domyślnie para `nipi` (IPI) ↔ **testowy token cw20**. Kolejne aktywa (IBC) = faza 2.
 - Zamiana kierunku (↑↓) from/to.
 
 ### 5.2 Kwotowanie (quote)
@@ -117,7 +128,8 @@ dostępu do zewnętrznej płynności i widoczności, gdy rynek natywny okrzepnie
 
 | Element | Rola | Uwagi |
 | --- | --- | --- |
-| **Kontrakt CosmWasm** | logika AMM (pool `x*y=k`, swap, LP) | fork audytowanego AMM; scaffolding przez `cw-template` (`cargo generate CosmWasm/cw-template`); kodegen TS przez `@cosmwasm/ts-codegen` |
+| **Kontrakt AMM (CosmWasm)** | logika AMM (pool `x*y=k`, swap, LP) | fork audytowanego AMM (Astroport pair-xyk / WYND); scaffolding przez `cw-template`; kodegen TS przez `@cosmwasm/ts-codegen` |
+| **Testowy token cw20 (MVP)** | druga strona pary `nipi ↔ cw20-test` | standardowy `cw20-base` (mint/faucet do testów); swap z cw20 przez `Cw20::Send` z hookiem do kontraktu AMM, swap z natywnego `nipi` przez `funds`; adres w `chainconfig` |
 | **`wallet-core.js`** | połączenie portfela, adres, saldo, podpis | zastępuje `cosmos-kit`/keplr ze szkieletu; interfejs: `getAddress()`, `getBalance()`, `signAndBroadcast()` |
 | **RPC** | zapytania łańcucha + broadcast | `https://ipicoin.eu/rpc` (`@cosmjs/cosmwasm-stargate` `SigningCosmWasmClient`) |
 | **`chainconfig`** | metadane łańcucha IPI | chain-id, `bech32Prefix`, denom `nipi`, `coinDecimals: 9`, endpoint RPC/REST; zastępuje wpis `chain-registry`/`osmosis` |
@@ -125,10 +137,14 @@ dostępu do zewnętrznej płynności i widoczności, gdy rynek natywny okrzepnie
 
 ### Model danych (SSOT)
 ```
-Denom:   base = "nipi", exponent = 9  →  1 IPI = 1_000_000_000 nipi
-Coin:    { denom: "nipi", amount: "<u128 w jednostkach bazowych>" }
-Token (UI): { symbol, denom, decimals, logo, amount(display), priceUsd? }
-Pool:    { id, assets: [{denom, reserve}], totalShares, swapFee }
+Denom:   base = "nipi", exponent = 9, symbol/ticker = "IPI"  →  1 IPI = 1_000_000_000 nipi
+AssetInfo (Astroport-style):
+         native → { native: "nipi" }
+         cw20   → { token: { contract_addr: "<adres cw20-test>" } }
+Coin:    { denom: "nipi", amount: "<u128 w jednostkach bazowych>" }   // asset natywny
+Cw20Amount: { contract_addr, amount: "<u128>" }                        // testowy token cw20
+Token (UI): { symbol, kind: "native"|"cw20", denom|contractAddr, decimals, logo, amount(display), priceUsd? }
+Pool:    { id, assets: [AssetInfo × reserve], totalShares, swapFee }   // MVP: [ {native:nipi}, {cw20:test} ]
 Quote:   { amountIn, amountOut, price, priceImpact, fee, minAmountOut, route[] }
 ```
 
@@ -140,10 +156,16 @@ Jako posiadacz IPI chcę połączyć portfel, aby zobaczyć saldo.
 - ✅ Widoczne saldo `nipi` w jednostkach display (÷10^9).
 - ✅ Błąd/odrzucenie połączenia pokazuje czytelny komunikat, brak crasha.
 
+**US-1b — Testowy token cw20 (MVP)**
+Jako tester chcę zdobyć testowy token cw20, aby móc wykonać swap w parze `nipi ↔ cw20`.
+- ✅ Kontrakt `cw20-base` wdrożony na łańcuchu IPI; adres w `chainconfig`.
+- ✅ Funkcja mint/faucet pozwala testerowi uzyskać saldo testowego cw20.
+- ✅ Saldo cw20 (query `Balance`) widoczne w UI obok salda `nipi`.
+
 **US-2 — Kwotowanie swapu**
 Jako użytkownik chcę wpisać kwotę i zobaczyć, ile dostanę.
-- ✅ Po wpisaniu `amountIn` w ≤1 s pojawia się `amountOut`, cena, price impact, opłata.
-- ✅ Zmiana pary/kierunku przelicza kwotowanie.
+- ✅ Po wpisaniu `amountIn` (np. `nipi` → testowy cw20) w ≤1 s pojawia się `amountOut`, cena, price impact, opłata.
+- ✅ Zmiana pary/kierunku (`nipi ↔ cw20`) przelicza kwotowanie.
 - ✅ Brak puli dla pary → jasny komunikat „brak płynności", przycisk swap zablokowany.
 
 **US-3 — Ustawienie slippage**
@@ -154,7 +176,7 @@ Jako użytkownik chcę ustawić tolerancję poślizgu.
 
 **US-4 — Wykonanie swapu**
 Jako użytkownik chcę wykonać wymianę.
-- ✅ „Swap" buduje msg, prosi o podpis w `wallet-core.js`, broadcastuje na `ipicoin.eu/rpc`.
+- ✅ „Swap" buduje msg (natywny `nipi` → `MsgExecuteContract` z `funds`; testowy cw20 → `Cw20::Send` z hookiem swap), prosi o podpis w `wallet-core.js`, broadcastuje na `ipicoin.eu/rpc`.
 - ✅ Sukces: toast + tx hash (link do eksploratora), salda odświeżone.
 - ✅ Transakcja zwrotna, gdy odbiór < `minAmountOut` (ochrona przed poślizgiem).
 - ✅ Błąd (brak gazu/odrzucenie/timeout) → komunikat, stan wraca do edytowalnego.
@@ -217,9 +239,9 @@ precising what it should do") wskazywał, że repozytorium to nienazwany szkiele
 `create-cosmos-app` bez zdefiniowanego celu. Ten PRD domyka #1, ustalając jednoznacznie:
 
 - **Czym Iswap jest:** niepowierniczy AMM DEX dla tokenów IPI na łańcuchu IPI.
-- **Co robi w MVP:** connect → wybór pary → kwotowanie → slippage → swap (§3, §5).
-- **Jak (model):** natywny CosmWasm `x*y=k` na IPI; Osmosis/IBC jako faza 2 (§4).
-- **Z czym się integruje:** `wallet-core.js`, RPC `ipicoin.eu/rpc`, `chainconfig`, denom `nipi`/9 (§6).
+- **Co robi w MVP:** connect → (faucet cw20) → wybór pary `nipi ↔ cw20-test` → kwotowanie → slippage → swap (§3, §5).
+- **Jak (model):** natywny CosmWasm `x*y=k` na IPI; para MVP `nipi ↔ testowy token cw20`; Osmosis/IBC jako faza 2 (§4).
+- **Z czym się integruje:** `wallet-core.js`, RPC `ipicoin.eu/rpc`, `chainconfig`, base denom `nipi`/9 (ticker IPI), kontrakt `cw20-base` testowy (§6).
 - **Czego NIE robi:** §11.
 
 Dalsze wątki suwerenności/tożsamości DAO: `universal-independency-declaration#1`.
