@@ -1,6 +1,7 @@
 {
   "name": "@hyperweb/swap-tokens",
   "version": "1.2.0",
+  "license": "MIT",
   "private": true,
   "scripts": {
     "dev": "next dev",
