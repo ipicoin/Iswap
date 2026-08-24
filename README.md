@@ -1,7 +1,7 @@
 # IPI Swap
 
-An experimental Cosmos swap interface used to study routing, pricing, wallet
-connection, slippage presentation, and transaction review.
+A Cosmos swap interface for evaluating routing, pricing, wallet connection,
+slippage presentation, and transaction-review integration.
 
 > **Status: inherited prototype.** It has no production safety claim, no
 > canonical liquidity source, and no audit. Do not use it with assets of value.
